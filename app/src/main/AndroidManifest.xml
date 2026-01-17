@@ -4,7 +4,6 @@
     package="com.example.imagepicker">
 
     <uses-sdk
-        android:minSdkVersion="19"
         tools:overrideLibrary="androidx.camera.view, androidx.camera.camera2, androidx.camera.lifecycle, androidx.camera.core" />
 
     <application
@@ -15,8 +14,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ImagePicker">
-        <activity android:name=".MainActivity">
-            <intent-filter>
+        <activity android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter android:exported="true">
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />

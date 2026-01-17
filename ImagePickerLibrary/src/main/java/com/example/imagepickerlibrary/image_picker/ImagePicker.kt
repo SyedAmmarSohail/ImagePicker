@@ -1,24 +1,19 @@
 package com.example.imagepickerlibrary.image_picker
 
 
-import android.app.Activity
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
-import com.github.florent37.inlineactivityresult.kotlin.startForResult
 import com.example.imagepickerlibrary.R
 import com.example.imagepickerlibrary.image_picker.model.Picker
 import com.example.imagepickerlibrary.image_picker.model.ImageProvider
 import com.example.imagepickerlibrary.image_picker.ui.ImagePickerActivity
-import com.example.imagepickerlibrary.util.FileUtil
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 object ImagePicker {
     internal const val EXTRA_MIME_TYPES = "extra.mime_types"
@@ -36,13 +31,9 @@ object ImagePicker {
     internal const val EXTRA_GALLERY_ICON = "extra.gallery.icon"
     internal const val EXTRA_CAMERA_SWITCH_ICON = "extra.camera_switch.icon"
 
-    @JvmStatic
-    fun with(activity: Activity): Builder {
-        return Builder(activity)
-    }
-
-    @JvmStatic
-    fun with(fragment: Fragment): Builder {
+    fun with(
+        fragment: Fragment
+    ): Builder {
         return Builder(fragment)
     }
 
@@ -64,47 +55,14 @@ object ImagePicker {
         return if (images.isNotEmpty()) images[0] else null
     }
 
-    /**
-     * Get selected images as Byte Array
-     * */
-    @JvmStatic
-    fun getPickerDataAsByteArray(context: Context, intent: Intent): ArrayList<ByteArray> {
-        val arrays = ArrayList<ByteArray>()
 
-        getSelectedPickerDatas(intent).forEach {
-            val byteArray = context.contentResolver.openInputStream(it.uri)?.readBytes()
-            byteArray?.let {
-                arrays.add(byteArray)
-            }
+    class Builder(val context: Context) {
+        constructor(fragment: Fragment) : this(fragment.requireContext()) {
+            fragmentLauncher =
+                fragment.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                    completionHandler.invoke(result.resultCode, result.data)
+                }
         }
-
-        return arrays
-    }
-
-    /**
-     * It copy file to a directory
-     * */
-//    fun getImagesAsFile(context: Context, intent: Intent): ArrayList<File> {
-//        val files = ArrayList<File>()
-//
-//        (context as AppCompatActivity).lifecycleScope.launch {
-//            getImages(intent).forEach {
-//                files.add(getFile(context, it.contentUri))
-//            }
-//        }
-//
-//        return files
-//    }
-
-
-    private suspend fun getFile(context: Context, uri: Uri) = withContext(Dispatchers.IO) {
-        FileUtil.fileFromContentUri(context, uri)
-    }
-
-
-    class Builder(private val activity: Activity) {
-
-        private var fragment: Fragment? = null
 
         private var imageProvider = ImageProvider.BOTH
 
@@ -113,6 +71,9 @@ object ImagePicker {
 
         // Mime types restrictions for gallery. by default all mime types are valid
         private var mimeTypes: Array<String> = arrayOf("image/png", "image/jpeg", "image/jpg")
+
+        private lateinit var fragmentLauncher: ActivityResultLauncher<Intent>
+        private lateinit var completionHandler: ((resultCode: Int, data: Intent?) -> Unit)
 
         /*
         * Crop Parameters
@@ -124,7 +85,6 @@ object ImagePicker {
 
         // Compress
         private var isToCompress: Boolean = false
-
 
         /*
         * Resize Parameters
@@ -140,19 +100,7 @@ object ImagePicker {
          */
         private var maxSize: Long = 0
 
-        constructor(fragment: Fragment) : this(fragment.requireActivity()) {
-            this.fragment = fragment
-        }
-
-        /**
-         * Only Capture image using Camera.
-         */
-        fun cameraOnly(): Builder {
-            this.imageProvider = ImageProvider.CAMERA
-            return this
-        }
-
-        fun bothWithCustom() : Builder{
+        fun bothWithCustom(): Builder {
             this.imageProvider = ImageProvider.BOTH_WITH_CUSTOM
             return this
         }
@@ -167,41 +115,9 @@ object ImagePicker {
             return this
         }
 
-        /**
-         * Only Pick image from gallery.
-         */
-        private fun galleryOnly(): Builder {
-            this.imageProvider = ImageProvider.GALLERY
+        fun setCompletionHandler(handler: ((resultCode: Int, data: Intent?) -> Unit)): Builder {
+            completionHandler = handler
             return this
-        }
-
-        /**
-         * Only pick one image
-         * */
-        fun singleSelection(): Builder {
-            isMultiSelection = false
-            return this
-        }
-
-        /**
-         * Pick many image. By default user can pick 5 images
-         * */
-        fun multiSelection(): Builder {
-            isMultiSelection = true
-            return this
-        }
-
-        /**
-         * Set an aspect ratio for crop bounds.
-         * User won't see the menu with other ratios options.
-         *
-         * @param x aspect ratio X
-         * @param y aspect ratio Y
-         */
-        fun crop(x: Float, y: Float): Builder {
-            cropX = x
-            cropY = y
-            return crop()
         }
 
         /**
@@ -209,6 +125,32 @@ object ImagePicker {
          */
         fun crop(): Builder {
             this.crop = true
+            return this
+        }
+
+
+        /**
+         * Only Capture image using Camera.
+         */
+        fun cameraOnly(): Builder {
+            this.imageProvider = ImageProvider.CAMERA
+            return this
+        }
+
+
+        fun crop(x: Float, y: Float): Builder {
+            cropX = x
+            cropY = y
+            return crop()
+        }
+
+        fun compressImage(maxWidth: Int = 612, maxHeight: Int = 816): Builder {
+            if (maxHeight > 10 && maxWidth > 10) {
+                this.maxWidth = maxWidth
+                this.maxHeight = maxHeight
+            }
+
+            isToCompress = true
             return this
         }
 
@@ -221,103 +163,32 @@ object ImagePicker {
         }
 
         /**
-         * Crop Square Image, Useful for Profile Image.
-         *
-         */
-        fun cropSquare(): Builder {
-            return crop(1f, 1f)
-        }
-
-        /**
-         * Max Width and Height of final image
-         */
-        fun maxResultSize(width: Int, height: Int): Builder {
-            this.maxWidth = width
-            this.maxHeight = height
-            return this
-        }
-
-        /**
-         * @param maxWidth must be greater than 10
-         * @param maxHeight must be greater than 10
-         * */
-        @JvmSuppressWildcards
-        @JvmOverloads
-        fun compressImage(maxWidth: Int = 612, maxHeight: Int = 816): Builder {
-            if (maxHeight > 10 && maxWidth > 10) {
-                this.maxWidth = maxWidth
-                this.maxHeight = maxHeight
-            }
-
-            isToCompress = true
-            return this
-        }
-
-        // TODO
-        private fun compressVideo(): Builder {
-
-            return this
-        }
-
-
-        // TODO will implement later
-        /**
-         * Restrict mime types during gallery fetching, for instance if you do not want GIF images,
-         * you can use arrayOf("image/png","image/jpeg","image/jpg")
-         * by default array is arrayOf("image/png","image/jpeg","image/jpg"),
-         * @param mimeTypes
-         */
-        fun galleryMimeTypes(mimeTypes: Array<String>): Builder {
-            this.mimeTypes = mimeTypes
-            return this
-        }
-
-        /**
-         * Select image from gallery
-         * */
-        fun onlyImage(): Builder {
-            this.mimeTypes = arrayOf("image/*")
-            return this
-        }
-
-        /**
-         * Select video from gallery
-         * */
-        fun onlyVideo(): Builder {
-            this.mimeTypes = arrayOf("video/*")
-            return this
-        }
-
-
-        /**
          * Start Image Picker Activity
          */
-        @JvmOverloads
-        @JvmSuppressWildcards
-        fun start(completionHandler: ((resultCode: Int, data: Intent?) -> Unit)? = null) {
+        fun start() {
             if (imageProvider == ImageProvider.BOTH) {
                 // Pick Image Provider if not specified
-                showImageProviderDialog(completionHandler)
+                showImageProviderDialog()
             } else {
-                startActivity(completionHandler)
+                startActivity()
             }
         }
 
-        private fun showImageProviderDialog(completionHandler: ((resultCode: Int, data: Intent?) -> Unit)? = null) {
-            val v = View.inflate(activity.baseContext, R.layout.dialog_image_picker_chooser, null)
+        private fun showImageProviderDialog() {
+            val v = View.inflate(context, R.layout.dialog_image_picker_chooser, null)
 
-            val d = Dialog(activity, R.style.Theme_AppCompat_Dialog_Alert)
+            val d = Dialog(context, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
             d.setContentView(v)
 
             v.findViewById<TextView>(R.id.btnCamera).setOnClickListener {
                 imageProvider = ImageProvider.CAMERA
-                start(completionHandler)
+                start()
                 d.dismiss()
             }
 
             v.findViewById<TextView>(R.id.btnGallery).setOnClickListener {
                 imageProvider = ImageProvider.GALLERY
-                start(completionHandler)
+                start()
                 d.dismiss()
             }
 
@@ -325,26 +196,14 @@ object ImagePicker {
 
         }
 
+
         /**
          * Start ImagePickerActivity with given Argument
          */
-        private fun startActivity(completionHandler: ((resultCode: Int, data: Intent?) -> Unit)? = null) {
-            val intent = Intent(activity, ImagePickerActivity::class.java)
+        private fun startActivity() {
+            val intent = Intent(context, ImagePickerActivity::class.java)
             intent.putExtras(getBundle())
-            if (fragment != null) {
-
-                fragment?.startForResult(intent) { result ->
-                    completionHandler?.invoke(result.resultCode, result.data)
-                }?.onFailed { result ->
-                    completionHandler?.invoke(result.resultCode, result.data)
-                }
-            } else {
-                (activity as AppCompatActivity).startForResult(intent) { result ->
-                    completionHandler?.invoke(result.resultCode, result.data)
-                }.onFailed { result ->
-                    completionHandler?.invoke(result.resultCode, result.data)
-                }
-            }
+            fragmentLauncher.launch(intent)
         }
 
         /**

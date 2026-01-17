@@ -12,22 +12,22 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        findViewById<TextView>(R.id.btnShowCameraOnlyWithCrop).setOnClickListener {
-            ImagePicker.with(this)
-                .bothWithCustom()
-//                .maxResultSize(200, 200)
-//                .compressImage(20, 20)
-                .cropOval()
-                .setGalleryIcon(R.drawable.gallery)
-                .setCameraSwitchIcon(R.drawable.switch_camera)
-                .start { resultCode, data ->
-                    if (resultCode == RESULT_OK && data != null) {
-                        val picker = ImagePicker.getPickerData(data)
-
-                        findViewById<ImageView>(R.id.iv).setImageURI(picker?.uri)
-
-                    }
-                }
-        }
+//        findViewById<TextView>(R.id.btnShowCameraOnlyWithCrop).setOnClickListener {
+//            ImagePicker.with(this)
+//                .bothWithCustom()
+////                .maxResultSize(200, 200)
+////                .compressImage(20, 20)
+//                .cropOval()
+//                .setGalleryIcon(R.drawable.gallery)
+//                .setCameraSwitchIcon(R.drawable.switch_camera)
+//                .start { resultCode, data ->
+//                    if (resultCode == RESULT_OK && data != null) {
+//                        val picker = ImagePicker.getPickerData(data)
+//
+//                        findViewById<ImageView>(R.id.iv).setImageURI(picker?.uri)
+//
+//                    }
+//                }
+//        }
     }
 }
